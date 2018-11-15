@@ -1,0 +1,116 @@
+# Each service defined in docker-compose.yml must specify exactly one of
+# image or build.
+#
+# As with docker run, options specified in the Dockerfile (e.g., CMD,
+# EXPOSE, VOLUME, ENV) are respected by default - you don't need to
+# specify them again in docker-compose.yml.
+version: '3'
+services:
+  # Odoo fronted service this name should be changed for each deployment on a shared network e.g. odoo-swbs
+  odoo-dms:
+    # Path to a directory containing a Dockerfile. When the value supplied
+    # is a relative path, it is interpreted as relative to the location of
+    # the yml file itself. This directory is also the build context that is
+    # sent to the Docker daemon.
+    build:
+      context: .
+      # docker file name
+      dockerfile: Dockerfile
+    # Compose will build and tag the image
+    image: odoo:11.0-source
+    # name of the container
+    container_name: odoo-dms
+    # Set the values of environment variables from the file
+    env_file:
+      - odoo.env
+    # the service which must be started before the odoo service
+    depends_on:
+      - postgres-dms
+    # links the service to the required service within the odoo container
+    # Link to containers in another service. Either specify both the service
+    # name and the link alias (SERVICE:ALIAS), or just the service name
+    # (which will also be used for the alias).
+    links:
+      - "postgres-dms:db"
+    # port bindings for the odoo container
+    # Expose ports. Either specify both ports (HOST:CONTAINER), or just the
+    ports:
+      - "1011:8069"
+    #restart: always
+    # the network with which the container will be connected 
+#    networks:
+#      # the name of the network and ip address to be assigned to the container
+#      net-sw-jo:
+#        aliases:
+#          - odoo-service
+    # volumes to be mounted from the container
+    # Mount paths as volumes, optionally specifying a path on the host machine
+    # (HOST:CONTAINER), or an access mode (HOST:CONTAINER:ro).
+    volumes:
+      # The volume containing all the git source codes, these are git repository clones
+      - source-clone:/mnt/source-clone
+      # this is the location of the base odoo addons, this location is based on odoo's installation defaults in the container
+      - ./source-clone/odoo/addons:/usr/lib/python3/dist-packages/odoo/addons
+      # Theis is where additional/complimentary addons can be placed, this is also based on odoo's installation defaults in the container
+      - ./source-clone/addons:/var/lib/odoo/addons/11.0
+      # this is the data directory of odoo where filestore and session information resides
+      - data:/var/lib/odoo
+      # this is the location for the configuration file
+      - config:/etc/odoo
+      # the location of the log files
+      - log:/var/log/odoo
+      # the location where backups are stored by default i.e. by our auto_backups module
+      - backups:/home/odoo/backups
+  
+  # the postgres backend service
+  postgres-dms:
+    # image from which the container will be instantiated/spawned
+    image: postgres:9.6
+    # name of the container
+    container_name: postgres-dms
+    # Set the values of environment variables from the file
+    env_file:
+      - odoo.env
+    restart: always
+    # the volumes for postgres container
+    volumes:
+      # the location for postgres data and config files in the container
+      - ./postgres:/var/lib/postgresql/data/pgdata
+    # networks with which the container will be connected
+#    networks:
+#      # name of the network with which the container will be connnected
+#      - net-sw-jo
+
+# Handling for the named volumes
+volumes:
+  source-clone:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      # location on host machine where named volume will be mounted
+      device: $PWD/source-clone
+  data:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: $PWD/data
+  config:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: $PWD/config
+  log:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: $PWD/log
+  backups:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: $PWD/backups
